@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+salidas/
+.DS_Store
+.ipynb_checkpoints/
+~$*.xlsx
+
+# Datos reales con información personal (no versionar)
+data exp/
