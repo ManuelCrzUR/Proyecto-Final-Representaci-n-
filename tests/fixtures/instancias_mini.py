@@ -3,7 +3,9 @@
 Cada fábrica devuelve un dict con las claves:
 ``instancia``, ``descripcion``, ``factible``, ``solucion`` (dict bloque ->
 Posicion o None), ``v_esperado_solucion`` y, según el caso, extras como
-``v_minimo``, ``solucion_vigente``, ``v_esperado_vigente`` o
+``v_minimo`` (mínimo global, permitiendo dejar bloques sin ubicar),
+``v_min_solo_anadir`` (mínimo entre estados maximales alcanzables solo con
+'añadir' legal), ``solucion_vigente``, ``v_esperado_vigente`` o
 ``posicion_ilegal``.
 """
 
@@ -104,6 +106,7 @@ def mini_infactible():
         "solucion": None,
         "v_esperado_solucion": None,
         "v_minimo": 1,
+        "v_min_solo_anadir": 1,
     }
 
 
@@ -161,7 +164,8 @@ def mini_sin_disponibilidad():
         "factible": False,
         "solucion": {"B1": Posicion(0, 0, "S1")},
         "v_esperado_solucion": 2,
-        "v_minimo": 2,
+        "v_minimo": 1,  # saltar el bloque (|U| = 1) es mejor que ubicarlo
+        "v_min_solo_anadir": 2,  # ubicándolo a la fuerza: 2 franjas sin A
     }
 
 

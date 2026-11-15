@@ -64,7 +64,7 @@ def test_infactibles_siempre_v_positivo(nombre):
     fx = getattr(instancias_mini, nombre)()
     finales = _completos_alcanzables(fx["instancia"])
     assert finales
-    assert min(costo.v(e) for e in finales) == fx["v_minimo"]
+    assert min(costo.v(e) for e in finales) == fx["v_min_solo_anadir"]
 
 
 @pytest.mark.parametrize("fabrica", TODAS_LAS_FIXTURES)

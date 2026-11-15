@@ -43,7 +43,7 @@ Las entidades, la `Posicion`, las acciones (`Anadir`, `Eliminar`, `Intercambiar`
   - `.bloques_en(celda) -> frozenset[str]`: bloques que ocupan la celda (dia, franja) en cualquier salón
   - `.ocupante(salon_id, celda) -> str | None`: bloque en ese salón y celda (siempre None si el salón es virtual)
   - `.copiar() -> Estado`; `.clave() -> Hashable` (igual para asignaciones iguales); `__eq__` y `__hash__` coherentes con `clave()`
-  - Mutadores de bajo nivel: `._colocar(bloque_id, pos)` y `._quitar(bloque_id)`. Solo los usa `acciones.py`.
+  - Mutadores de bajo nivel: `._colocar(bloque_id, pos)` y `._quitar(bloque_id)`. Los usa `acciones.py`, y como excepción documentada también `algoritmos/reparacion.py`, para armar el estado vigente omitiendo los bloques que chocan.
   - API extra estable (agregada en la ola 2.1): `.ocupacion_docente(docente_id, celda) -> int` y `.ocupacion_grupo(grupo_id, celda) -> int`.
   - `Estado` es mutable: no se debe mutar mientras sea clave de un dict o miembro de un set. `acciones_legales` es un generador sobre el estado vivo, así que hay que materializarlo con `list()` antes de mutar.
 
@@ -91,3 +91,33 @@ Las entidades, la `Posicion`, las acciones (`Anadir`, `Eliminar`, `Intercambiar`
 | 2.1 | E | Sonnet | `planificador/core/conflictos.py`, `planificador/core/costo.py`, `planificador/core/validador.py`, `tests/test_costo.py`, `tests/test_validador.py` |
 | 2.1 | F | Haiku | `tests/fixtures/__init__.py`, `tests/fixtures/instancias_mini.py`, `tests/test_fixtures.py` |
 | 2.2 | G | Sonnet | `planificador/io_datos/sintetico.py`, `tests/test_sintetico.py` |
+
+## Sprint 3: algoritmos (contrato)
+
+`planificador/algoritmos/base.py` (congelado) define `Solver`, `Limites`, `Evento`, `Traza`, `Resultado`, `Presupuesto` y `foto`. `planificador/algoritmos/comun.py` es del orquestador y define `dominio_unario`, `consistente`, `dominio_consistente`, `elegir_mrv` y `resultado_desde`.
+
+**Reglas comunes a todos los solvers:**
+- Son una subclase de `Solver`, con atributo de clase `nombre` y los parámetros en `__init__(**parametros)`.
+- `resolver(instancia, estado_inicial=None, limites=Limites())` no muta `estado_inicial`. Los bloques ya ubicados en él quedan **fijos**: solo se ubican los bloques de U(X).
+- Respetan el `Presupuesto`: incrementan `nodos_expandidos` y `nodos_generados`, y revisan `agotado()` en cada expansión.
+- **Siempre** devuelven el mejor estado encontrado, con el menor F, mediante `resultado_desde`. `terminado_por` ∈ {meta, agotado, limite_nodos, limite_tiempo}.
+- Registran la traza con los tipos de `TIPOS_EVENTO`. Los eventos `add` y `del` llevan bloque y posición. En A\*, avara y beam, el evento `expandir` lleva `asignacion=foto(...)`. Al final se registra un evento `fin` con `nota=terminado_por`.
+- Son deterministas: con los mismos datos dan el mismo resultado. Si usan azar, la semilla es un parámetro.
+- **Saltar un bloque:** si un bloque no tiene dominio consistente, la búsqueda puede dejarlo sin ubicar, y eso cuesta 1 en v por U(X). Así el solver devuelve siempre un horario lo más completo posible, aun en instancias infactibles.
+
+**Costo de camino de A\*, avara y beam (aditivo y monótono):**
+- Un nodo es un estado parcial más el conjunto de bloques ya **decididos** (ubicados o saltados). La variable a decidir se elige con `elegir_mrv` sobre los no decididos, y los sucesores son sus posiciones de `dominio_unario`, más la opción "saltar".
+- g(n) = λ·[v_disp + v_vent + v_conf + #saltados](n) + w_ext·φ_extrema(n) + w_carga·φ_carga(n). Todos esos términos solo crecen al decidir bloques, así que el costo de paso es ≥ 0.
+- Los huecos, la dispersión y el cambio de sede **no son aditivos**: un bloque puede rellenar un hueco y bajar el costo. Por eso no entran en g. Se evalúan al final con F completo y se reportan. Esto se discute en el informe.
+- h(n) = λ·#(no decididos con dominio consistente vacío) + Σ_no decididos w_ext·min_{p ∈ dominio consistente} franjas extremas de p. Es admisible porque cada término es una cota inferior independiente del costo futuro de su bloque.
+- Avara: f(n) = h(n). A\*: f(n) = g(n) + h(n). Beam: conserva los k mejores por g + h en cada nivel.
+
+## Dueños: sprint 3
+
+| Ola | Agente | Modelo | Archivos |
+|---|---|---|---|
+| 3.0 | Orquestador | Opus | `algoritmos/base.py`, `algoritmos/comun.py`, `tests/test_algoritmos_base.py`, `docs/contrato.md` |
+| 3.1 | H | Sonnet | `algoritmos/backtracking.py`, `tests/test_backtracking.py` |
+| 3.1 | I | Sonnet | `algoritmos/informada.py` (nodo, g, h y sucesores compartidos; avara y A\*), `algoritmos/beam.py`, `tests/test_informada.py`, `tests/test_beam.py` |
+| 3.2 | K | Sonnet | `algoritmos/reparacion.py`, `tests/test_reparacion.py` |
+| 3.2 | L | Haiku | `tests/test_solvers_cruzado.py` |
