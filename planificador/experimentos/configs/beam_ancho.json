@@ -1,0 +1,70 @@
+{
+  "nombre": "beam_ancho",
+  "semillas": [
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "tamanos": [
+    20,
+    50
+  ],
+  "dificultades": {
+    "holgada": {},
+    "ajustada": {
+      "prob_disponible": 0.2,
+      "prob_ventana": 0.35,
+      "num_franjas": 6
+    }
+  },
+  "escenarios": [
+    "construccion"
+  ],
+  "algoritmos": [
+    {
+      "nombre": "beam",
+      "parametros": {
+        "ancho": 1
+      },
+      "etiqueta": "beam_k1"
+    },
+    {
+      "nombre": "beam",
+      "parametros": {
+        "ancho": 2
+      },
+      "etiqueta": "beam_k2"
+    },
+    {
+      "nombre": "beam",
+      "parametros": {
+        "ancho": 5
+      },
+      "etiqueta": "beam_k5"
+    },
+    {
+      "nombre": "beam",
+      "parametros": {
+        "ancho": 10
+      },
+      "etiqueta": "beam_k10"
+    },
+    {
+      "nombre": "beam",
+      "parametros": {
+        "ancho": 20
+      },
+      "etiqueta": "beam_k20"
+    }
+  ],
+  "limites": {
+    "max_segundos": 15,
+    "max_nodos": 100000
+  },
+  "perturbacion": {
+    "num_docentes": 1,
+    "fraccion": 0.25
+  }
+}

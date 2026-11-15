@@ -121,3 +121,19 @@ Las entidades, la `Posicion`, las acciones (`Anadir`, `Eliminar`, `Intercambiar`
 | 3.1 | I | Sonnet | `algoritmos/informada.py` (nodo, g, h y sucesores compartidos; avara y A\*), `algoritmos/beam.py`, `tests/test_informada.py`, `tests/test_beam.py` |
 | 3.2 | K | Sonnet | `algoritmos/reparacion.py`, `tests/test_reparacion.py` |
 | 3.2 | L | Haiku | `tests/test_solvers_cruzado.py` |
+
+## Sprint 4: experimentos e interfaz (contrato)
+
+Piezas compartidas del orquestador, que las demás piezas deben usar en lugar de duplicarlas:
+- `planificador/algoritmos/registro.py`: `REGISTRO` (nombre → clase, descripción, parámetros por defecto y ajustables), `NOMBRES` y `crear_solver(nombre, **params)`.
+- `planificador/algoritmos/reproduccion.py`: `cuadros_de_resultado(resultado, asignacion_inicial=None, max_cuadros=None)` → lista de `Cuadro(indice, evento, asignacion, resaltado)`. El último cuadro siempre es la solución final.
+- Las gráficas estáticas usan matplotlib (PNG) y las interactivas de la app usan plotly.
+
+## Dueños: sprint 4
+
+| Ola | Agente | Modelo | Archivos |
+|---|---|---|---|
+| 4.0 | Orquestador | Opus | `algoritmos/registro.py`, `algoritmos/reproduccion.py`, `tests/test_registro_reproduccion.py`, `requirements.txt` (+matplotlib), `docs/contrato.md` |
+| 4.1 | M | Sonnet | `planificador/experimentos/**` (runner.py, graficas.py, configs/*.json), `tests/test_experimentos.py` |
+| 4.1 | N | Sonnet | `planificador/app/**`, `tests/test_app.py` |
+| 4.2 | O | Haiku | `README.md` |

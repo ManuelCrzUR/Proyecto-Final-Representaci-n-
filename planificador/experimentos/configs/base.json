@@ -1,0 +1,72 @@
+{
+  "nombre": "base",
+  "semillas": [
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "tamanos": [
+    20,
+    50,
+    100,
+    200
+  ],
+  "dificultades": {
+    "holgada": {},
+    "ajustada": {
+      "prob_disponible": 0.2,
+      "prob_ventana": 0.35,
+      "num_franjas": 6
+    }
+  },
+  "escenarios": [
+    "construccion",
+    "reparacion"
+  ],
+  "algoritmos": [
+    {
+      "nombre": "backtracking",
+      "parametros": {
+        "modo": "primera"
+      },
+      "etiqueta": "backtracking"
+    },
+    {
+      "nombre": "backtracking",
+      "parametros": {
+        "modo": "optimizar"
+      },
+      "etiqueta": "backtracking_opt",
+      "max_n": 20
+    },
+    {
+      "nombre": "avara",
+      "parametros": {},
+      "etiqueta": "avara"
+    },
+    {
+      "nombre": "beam",
+      "parametros": {
+        "ancho": 5
+      },
+      "etiqueta": "beam_k5",
+      "max_n": 100
+    },
+    {
+      "nombre": "a_estrella",
+      "parametros": {},
+      "etiqueta": "a_estrella",
+      "max_n": 50
+    }
+  ],
+  "limites": {
+    "max_segundos": 15,
+    "max_nodos": 100000
+  },
+  "perturbacion": {
+    "num_docentes": 1,
+    "fraccion": 0.25
+  }
+}
