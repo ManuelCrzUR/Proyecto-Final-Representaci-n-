@@ -98,6 +98,8 @@ class Bloque:
     tipo_sesion: str = "TEORIA"  # TEORIA | TALLER | PRACTICA
     tipo_salon: Optional[str] = None  # None = cualquier tipo
     virtual: bool = False  # True = debe ir en un salón virtual
+    serie: Optional[str] = None  # bloques con la misma serie comparten el tope diario
+    max_franjas_dia: Optional[int] = None  # tope DURO de franjas de la serie por día (None = sin tope)
 
 
 @dataclass(frozen=True)
