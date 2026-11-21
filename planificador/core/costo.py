@@ -62,6 +62,22 @@ def _salon_invalido(instancia, bloque, pos) -> bool:
 # Violaciones
 # --------------------------------------------------------------------------
 
+def _exceso_modulo_dia(instancia: Instancia, colocados: dict,
+                       asignacion: Mapping) -> int:
+    """C14: franjas de exceso sobre el tope diario de cada serie."""
+    uso: dict = {}
+    tope: dict = {}
+    for m, b in colocados.items():
+        if b.serie is None or b.max_franjas_dia is None:
+            continue
+        k = (b.serie, asignacion[m].dia)
+        uso[k] = uso.get(k, 0) + b.duracion
+        t = tope.get(b.serie)
+        tope[b.serie] = (b.max_franjas_dia if t is None
+                         else min(t, b.max_franjas_dia))
+    return sum(max(0, n - tope[s]) for (s, _), n in uso.items())
+
+
 def _violaciones_de(instancia: Instancia,
                     asignacion: Mapping) -> Violaciones:
     """v(X) desglosado, calculado sobre un dict bloque_id -> Posicion."""
@@ -95,7 +111,8 @@ def _violaciones_de(instancia: Instancia,
             if m < n and n in colocados:
                 conflicto += len(set(celdas[m]) & set(celdas[n]))
     return Violaciones(sin_ubicar, disponibilidad, ventana, conflicto,
-                       choques + salon_inv)
+                       choques + salon_inv,
+                       _exceso_modulo_dia(instancia, colocados, asignacion))
 
 
 def violaciones(estado) -> Violaciones:

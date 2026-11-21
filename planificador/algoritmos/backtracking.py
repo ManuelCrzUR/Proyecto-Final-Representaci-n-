@@ -331,11 +331,17 @@ class _Busqueda:
         vecinos = self.gamma[x]
         salon_fisico = not inst.salon[p.salon].virtual
         bloque = inst.bloque
+        # C14: tope diario por serie; ``usado`` ya incluye a x.
+        serie = bloque[x].serie
+        usado = (self.estado.franjas_serie(serie, p.dia)
+                 if serie is not None and bloque[x].max_franjas_dia is not None
+                 else None)
         for u in list(self.dom):
             dom_u = self.dom[u]
             if not dom_u:
                 continue
             du = bloque[u].duracion
+            nuevo = None
             if u in vecinos:
                 nuevo = [q for q in dom_u
                          if not _solapan(p.dia, p.franja, dx, q, du)]
@@ -343,7 +349,12 @@ class _Busqueda:
                 nuevo = [q for q in dom_u
                          if not (q.salon == p.salon
                                  and _solapan(p.dia, p.franja, dx, q, du))]
-            else:
+            if (usado is not None and bloque[u].serie == serie
+                    and bloque[u].max_franjas_dia is not None
+                    and usado + du > bloque[u].max_franjas_dia):
+                nuevo = [q for q in (dom_u if nuevo is None else nuevo)
+                         if q.dia != p.dia]
+            if nuevo is None:
                 continue
             if len(nuevo) == len(dom_u):
                 continue

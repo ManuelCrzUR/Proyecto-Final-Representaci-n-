@@ -17,6 +17,10 @@ legalidad de salón (tipo, capacidad, modalidad): un estado "vigente" puede
 venir dado. Si dos bloques chocan en un salón no virtual, el índice
 salón×celda no puede representar ambos y se lanza ``ValueError``.
 
+Índice C14: ``franjas_serie(serie, dia)`` mantiene la suma de duraciones de
+los bloques ubicados de cada serie por día (O(1) por consulta y por
+actualización); lo usa la legalidad para el tope diario por módulo.
+
 Un ``Estado`` es mutable; ``__hash__`` se calcula sobre ``clave()`` en el
 momento de la llamada, por lo que no debe mutarse mientras sea clave de un
 dict o miembro de un set.
@@ -34,7 +38,7 @@ class Estado:
     """Asignación parcial bloque_id -> Posicion con índices de ocupación."""
 
     __slots__ = ("instancia", "_asig", "_vista", "_sin", "_salon_celda",
-                 "_celda", "_docente", "_grupo", "_salones_ord")
+                 "_celda", "_docente", "_grupo", "_serie", "_salones_ord")
 
     def __init__(self, instancia: Instancia,
                  asignacion: Optional[dict] = None) -> None:
@@ -46,6 +50,8 @@ class Estado:
         self._celda: dict = {}
         self._docente: dict = {}
         self._grupo: dict = {}
+        # (serie, dia) -> franjas ocupadas por bloques ubicados de la serie.
+        self._serie: dict = {}
         # Salones ordenados por id, compartido entre copias (inmutable).
         self._salones_ord = tuple(sorted(s.id for s in instancia.salones))
         for bloque_id, pos in (asignacion or {}).items():
@@ -96,6 +102,11 @@ class Estado:
         """Número de bloques ubicados del grupo que ocupan la celda."""
         return self._grupo.get((grupo_id, celda), 0)
 
+    def franjas_serie(self, serie: str, dia: int) -> int:
+        """Franjas (suma de duraciones) de los bloques ubicados de la serie
+        ese día (C14). O(1)."""
+        return self._serie.get((serie, dia), 0)
+
     # --- copia, identidad ----------------------------------------------
     def copiar(self) -> "Estado":
         """Copia barata: copia superficial de índices; la instancia se
@@ -109,6 +120,7 @@ class Estado:
         nuevo._celda = {c: set(s) for c, s in self._celda.items()}
         nuevo._docente = dict(self._docente)
         nuevo._grupo = dict(self._grupo)
+        nuevo._serie = dict(self._serie)
         nuevo._salones_ord = self._salones_ord
         return nuevo
 
@@ -151,6 +163,9 @@ class Estado:
                         f"{pos.salon}, celda {c}")
         self._asig[bloque_id] = pos
         self._sin.discard(bloque_id)
+        if bloque.serie is not None:
+            k = (bloque.serie, pos.dia)
+            self._serie[k] = self._serie.get(k, 0) + bloque.duracion
         for c in celdas:
             if not virtual:
                 self._salon_celda[(pos.salon, c)] = bloque_id
@@ -170,6 +185,13 @@ class Estado:
         bloque = inst.bloque[bloque_id]
         virtual = inst.salon[pos.salon].virtual
         self._sin.add(bloque_id)
+        if bloque.serie is not None:
+            k = (bloque.serie, pos.dia)
+            resto = self._serie[k] - bloque.duracion
+            if resto > 0:
+                self._serie[k] = resto
+            else:
+                del self._serie[k]
         for c in celdas_de(pos, bloque.duracion):
             if not virtual:
                 del self._salon_celda[(pos.salon, c)]

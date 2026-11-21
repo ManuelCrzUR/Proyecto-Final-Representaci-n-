@@ -13,7 +13,7 @@
 from __future__ import annotations
 
 from planificador.core import costo
-from planificador.core.acciones import posiciones_legales
+from planificador.core.acciones import dias_sin_cupo, posiciones_legales
 from planificador.core.estado import Estado
 from planificador.core.modelo import celdas_de
 
@@ -65,12 +65,18 @@ def dominio_unario(estado, bloque_id) -> list:
     """Posiciones legales (salón libre, tipo, capacidad) que respetan A y W.
 
     Equivale a filtrar ``posiciones_legales`` por A y W, pero parte del
-    dominio base memoizado y solo revisa la ocupación de salones.
+    dominio base memoizado y solo revisa la ocupación de salones y el tope
+    diario por serie (C14, que depende del estado).
     """
     inst = estado.instancia
     dur = inst.bloque[bloque_id].duracion
-    return [p for p in _dominio_base(inst, bloque_id)
-            if _salon_libre(estado, bloque_id, dur, p)]
+    base = _dominio_base(inst, bloque_id)
+    # C14: el tope diario por serie depende del estado (no es memoizable).
+    sin_cupo = dias_sin_cupo(estado, bloque_id)
+    if sin_cupo:
+        return [p for p in base if p.dia not in sin_cupo
+                and _salon_libre(estado, bloque_id, dur, p)]
+    return [p for p in base if _salon_libre(estado, bloque_id, dur, p)]
 
 
 def consistente(estado, bloque_id, pos) -> bool:

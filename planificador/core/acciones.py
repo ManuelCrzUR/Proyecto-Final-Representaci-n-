@@ -2,8 +2,10 @@
 
 Implementa la API de ``docs/contrato.md`` (Sprint 2, ``core/acciones.py``).
 
-La legalidad solo cubre restricciones de forma y de salón; NO filtra
-disponibilidad (A), ventana (W) ni conflictos (Γ), que se cuentan en v(X).
+La legalidad cubre forma, salón y el tope diario por serie (C14: la suma de
+duraciones de los bloques de una serie en un día no excede
+``Bloque.max_franjas_dia``); NO filtra disponibilidad (A), ventana (W) ni
+conflictos (Γ), que se cuentan en v(X).
 
 Decisiones ante ambigüedades:
 
@@ -73,11 +75,52 @@ def _libre(estado: Estado, bloque_id: str, pos: Posicion,
     return True
 
 
+def _usado_serie(estado: Estado, bloque_id: str, dia: int,
+                 ignorar: tuple = ()) -> int:
+    """Franjas de la serie del bloque ese día, sin contar a ``ignorar`` ni al
+    propio bloque (que se quitaría antes de ubicarlo)."""
+    inst = estado.instancia
+    b = inst.bloque[bloque_id]
+    usado = estado.franjas_serie(b.serie, dia)
+    for o in set(ignorar) | {bloque_id}:
+        po = estado.posicion(o)
+        if po is not None and po.dia == dia:
+            ob = inst.bloque[o]
+            if ob.serie == b.serie:
+                usado -= ob.duracion
+    return usado
+
+
+def _tope_serie(estado: Estado, bloque_id: str, pos: Posicion,
+                ignorar: tuple = ()) -> bool:
+    """C14: ubicar el bloque en ``pos`` no excede el tope diario de su serie."""
+    b = estado.instancia.bloque[bloque_id]
+    if b.serie is None or b.max_franjas_dia is None:
+        return True
+    return (_usado_serie(estado, bloque_id, pos.dia, ignorar) + b.duracion
+            <= b.max_franjas_dia)
+
+
+def dias_sin_cupo(estado: Estado, bloque_id: str):
+    """Días en que el tope de la serie impide ubicar el bloque (C14).
+
+    ``None`` si el bloque no tiene tope (caso sin topes: sin costo extra).
+    """
+    b = estado.instancia.bloque[bloque_id]
+    if b.serie is None or b.max_franjas_dia is None:
+        return None
+    return frozenset(
+        d for d in range(estado.instancia.num_dias)
+        if _usado_serie(estado, bloque_id, d) + b.duracion
+        > b.max_franjas_dia)
+
+
 def _pos_legal(estado: Estado, bloque_id: str, pos: Posicion,
                ignorar: tuple = ()) -> bool:
     return (_cabe(estado, bloque_id, pos)
             and _salon_compatible(estado, bloque_id, pos.salon)
-            and _libre(estado, bloque_id, pos, ignorar))
+            and _libre(estado, bloque_id, pos, ignorar)
+            and _tope_serie(estado, bloque_id, pos, ignorar))
 
 
 # --------------------------------------------------------------------------
@@ -172,8 +215,11 @@ def posiciones_legales(estado: Estado, bloque_id: str) -> list:
     salones = [s for s in estado._salones_ord
                if _salon_compatible(estado, bloque_id, s)]
     virtual = {s: inst.salon[s].virtual for s in salones}
+    sin_cupo = dias_sin_cupo(estado, bloque_id) or ()
     resultado = []
     for dia in range(inst.num_dias):
+        if dia in sin_cupo:
+            continue
         for franja in range(inst.num_franjas - dur + 1):
             celdas = [(dia, franja + i) for i in range(dur)]
             for s in salones:

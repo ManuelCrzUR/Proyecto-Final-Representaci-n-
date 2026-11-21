@@ -114,7 +114,7 @@ def costo_camino(instancia, asignacion, saltados) -> float:
     phi = costo._desglose_de(instancia, asignacion)
     w = instancia.pesos
     duros = (viol.disponibilidad + viol.ventana + viol.conflicto
-             + viol.salon + len(set(saltados)))
+             + viol.salon + viol.modulo_dia + len(set(saltados)))
     return (lam * duros + w.hora_extrema * phi["hora_extrema"]
             + w.carga_grupo * phi["carga_grupo"])
 

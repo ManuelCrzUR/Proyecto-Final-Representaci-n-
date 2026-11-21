@@ -157,8 +157,28 @@ def _violaciones(instancia, asignacion, problemas) -> Violaciones:
             problemas.append(
                 f"Bloques {', '.join(ids)} comparten el salón {sid} el día "
                 f"{celda[0]} franja {celda[1]}")
+
+    # C14: tope diario por serie (franjas de exceso).
+    uso = {}
+    tope = {}
+    modulo = {}
+    for b in ubicados:
+        if b.serie is None or b.max_franjas_dia is None:
+            continue
+        k = (b.serie, asignacion[b.id].dia)
+        uso[k] = uso.get(k, 0) + b.duracion
+        if b.serie not in tope or b.max_franjas_dia < tope[b.serie]:
+            tope[b.serie] = b.max_franjas_dia
+        modulo.setdefault(b.serie, b.modulo_id)
+    modulo_dia = 0
+    for (serie, dia), n in sorted(uso.items()):
+        if n > tope[serie]:
+            modulo_dia += n - tope[serie]
+            problemas.append(
+                f"El módulo {modulo[serie]} tiene {n} franjas el día {dia} "
+                f"(máximo {tope[serie]})")
     return Violaciones(sin_ubicar, disponibilidad, ventana, conflicto,
-                       salon_inv)
+                       salon_inv, modulo_dia)
 
 
 def _huecos_y_franjas(ocupadas_por_dia: dict):

@@ -114,6 +114,23 @@ def bloques_invalidos(instancia: Instancia, asignacion: dict) -> frozenset:
                 if celdas[bid] & celdas[otro]:
                     invalidos.add(bid)
                     break
+    # C14: si una serie excede su tope diario con los bloques válidos, se
+    # liberan (de id mayor a menor) los que sobran de ese día.
+    por_serie: dict = {}
+    for bid in sorted(ubicados):
+        b = instancia.bloque[bid]
+        if (bid in invalidos or b.serie is None
+                or b.max_franjas_dia is None):
+            continue
+        por_serie.setdefault((b.serie, ubicados[bid].dia), []).append(b)
+    for lista in por_serie.values():
+        usado = sum(b.duracion for b in lista)
+        tope = min(b.max_franjas_dia for b in lista)
+        for b in reversed(lista):
+            if usado <= tope:
+                break
+            invalidos.add(b.id)
+            usado -= b.duracion
     return frozenset(invalidos)
 
 

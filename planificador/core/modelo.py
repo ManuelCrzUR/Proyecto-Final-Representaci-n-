@@ -243,6 +243,9 @@ class Violaciones:
 
     ``salon`` cuenta celdas con dos bloques en un salón no virtual o bloques en
     salones de capacidad/tipo/modalidad inválidos; con acciones legales es 0.
+    ``modulo_dia`` (C14) suma las franjas de exceso sobre el tope diario de
+    cada serie (``Bloque.serie`` / ``Bloque.max_franjas_dia``); con acciones
+    legales es 0.
     """
 
     sin_ubicar: int = 0
@@ -250,11 +253,12 @@ class Violaciones:
     ventana: int = 0
     conflicto: int = 0
     salon: int = 0
+    modulo_dia: int = 0
 
     @property
     def total(self) -> int:
         return (self.sin_ubicar + self.disponibilidad + self.ventana
-                + self.conflicto + self.salon)
+                + self.conflicto + self.salon + self.modulo_dia)
 
 
 # --------------------------------------------------------------------------
