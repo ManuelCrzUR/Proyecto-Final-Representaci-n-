@@ -53,3 +53,22 @@ def test_dominio_consistente_y_mrv():
     doms = {b: dominio_consistente(e, b) for b in ("B2", "B3")}
     elegido = elegir_mrv(doms, construir_conflictos(inst))
     assert len(doms[elegido]) == min(len(d) for d in doms.values())
+
+
+def test_dominio_unario_con_cache_equivale_a_la_definicion():
+    """La caché del dominio base da lo mismo que filtrar posiciones_legales."""
+    import random
+
+    from planificador.algoritmos.comun import _respeta_unarias, dominio_unario
+    from planificador.core.acciones import posiciones_legales
+    from planificador.io_datos.sintetico import generar_instancia
+
+    inst, sol = generar_instancia(30, 3, prob_disponible=0.4)
+    rng = random.Random(0)
+    for _ in range(5):
+        elegidos = rng.sample(sorted(sol), 15)
+        est = Estado(inst, {b: sol[b] for b in elegidos})
+        for b in inst.bloques:
+            esperado = [p for p in posiciones_legales(est, b.id)
+                        if _respeta_unarias(inst, b, p)]
+            assert dominio_unario(est, b.id) == esperado

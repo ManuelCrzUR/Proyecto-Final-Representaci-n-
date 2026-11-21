@@ -25,11 +25,9 @@ def _generar(n, semilla, dias, franjas, dificultad, factible):
 
 
 def _fixtures() -> dict:
-    """Fixtures mini disponibles (vacío si ``tests`` no está importable)."""
-    try:
-        from tests.fixtures.instancias_mini import TODAS_LAS_FIXTURES
-    except ImportError:
-        return {}
+    """Instancias mini de demostración, indexadas por nombre."""
+    from planificador.datos_demo import TODAS_LAS_FIXTURES
+
     salida = {}
     for fabrica in TODAS_LAS_FIXTURES:
         d = fabrica()

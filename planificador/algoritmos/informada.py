@@ -480,13 +480,19 @@ class Avara(_Informada):
     Además se suma λ·#saltados: sin ese término "saltar" siempre parecería
     el hijo más cercano a la meta (quita el término del bloque de h y no
     paga nada) y la avara descartaría bloques sin necesidad.
+
+    Parámetros: ``detectar_repetidos`` (poda de estados repetidos) y
+    ``peso_distancia`` (peso de los bloques por decidir en h_avara). No tiene
+    ``peso_h``: su f no usa la h admisible ponderada, así que aceptarlo
+    sería engañoso.
     """
 
     nombre = "avara"
 
-    def __init__(self, peso_h: float = 1.0, detectar_repetidos: bool = True,
+    def __init__(self, detectar_repetidos: bool = True,
                  peso_distancia: float = 1.0):
-        super().__init__(peso_h=peso_h, detectar_repetidos=detectar_repetidos)
+        super().__init__(peso_h=1.0, detectar_repetidos=detectar_repetidos)
+        del self.parametros["peso_h"]
         self.parametros["peso_distancia"] = peso_distancia
         self.peso_distancia = peso_distancia
         self._total = 0

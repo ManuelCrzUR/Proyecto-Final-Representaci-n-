@@ -137,3 +137,60 @@ def test_radio_libera_vecinos():
     assert res.extra["intentos"] >= 2
     assert res.asignacion["A"] == Posicion(0, 1, "S1")
     assert validar(inst, res.asignacion).violaciones.total == 0
+
+
+# --- Sprint 5: la traza reproducida termina exactamente en el resultado ---
+
+NOMBRES_SOLVER = ["backtracking", "a_estrella", "avara", "beam"]
+
+
+def _inicial(instancia, vigente):
+    """Estado de partida que usa la app: vigente menos inválidos."""
+    inval = bloques_invalidos(instancia, vigente)
+    return {b: p for b, p in vigente.items()
+            if b in instancia.bloque and b not in inval}
+
+
+def _caso_dificil(semilla):
+    inst, sol = generar_instancia(30, 2, prob_disponible=0.1, prob_ventana=0.3)
+    pert = perturbar_disponibilidad(inst, sol, semilla, num_docentes=2,
+                                    fraccion=0.8)
+    return pert, sol
+
+
+@pytest.mark.parametrize("nombre", NOMBRES_SOLVER)
+@pytest.mark.parametrize("semilla", range(6))
+def test_traza_termina_en_resultado(nombre, semilla):
+    from planificador.algoritmos.registro import crear_solver
+    from planificador.algoritmos.reproduccion import lista_cuadros
+    pert, sol = _caso_dificil(semilla)
+    res = reparar(pert, sol, crear_solver(nombre),
+                  Limites(max_nodos=2_000, max_segundos=3))
+    cuadros = lista_cuadros(res.traza, _inicial(pert, sol))
+    assert cuadros[-1].asignacion == res.asignacion
+    assert res.traza.eventos[-1].tipo == "fin"
+
+
+@pytest.mark.parametrize("fabrica", SOLVERS)
+def test_traza_un_solo_intento(fabrica):
+    from planificador.algoritmos.reproduccion import lista_cuadros
+    d = mini_reparacion()
+    inst, vigente = d["instancia"], d["solucion_vigente"]
+    res = reparar(inst, vigente, fabrica(), LIM)
+    assert res.extra["intentos"] == 1
+    cuadros = lista_cuadros(res.traza, _inicial(inst, vigente))
+    assert cuadros[-1].asignacion == res.asignacion
+
+
+@pytest.mark.parametrize("nombre", NOMBRES_SOLVER)
+def test_traza_truncada_conserva_sincronizacion(nombre):
+    from planificador.algoritmos.registro import crear_solver
+    from planificador.algoritmos.reproduccion import lista_cuadros
+    pert, sol = _caso_dificil(0)
+    res = reparar(pert, sol, crear_solver(nombre),
+                  Limites(max_nodos=2_000, max_segundos=3,
+                          max_eventos_traza=5))
+    assert res.traza.truncada
+    assert [e.tipo for e in res.traza.eventos[-2:]] == ["mejora", "fin"]
+    cuadros = lista_cuadros(res.traza, _inicial(pert, sol))
+    assert cuadros[-1].asignacion == res.asignacion

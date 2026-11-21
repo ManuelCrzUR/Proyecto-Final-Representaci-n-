@@ -39,7 +39,7 @@ Autores: Manuel Cruz y Santiago Peña.
 | Algoritmo | Clave | Descripción |
 |---|---|---|
 | Backtracking (CSP) | `backtracking` | Backtracking (CSP) con MRV + grado y forward checking. Modos `primera` y `optimizar`. |
-| A* | `a_estrella` | A* con heurística admisible y consistente (óptimo en costo aditivo). |
+| A* | `a_estrella` | A* con heurística admisible y consistente: óptimo respecto del costo aditivo g (no incluye huecos, dispersión ni cambio de sede). |
 | Avara | `avara` | Búsqueda avara: heurística de distancia a la meta (no admisible). |
 | Beam search | `beam` | Beam search: conserva los k mejores nodos por nivel (g + h). |
 | Reparación | `reparar()` en `planificador/algoritmos/reparacion.py` | Repara un horario vigente tras un cambio de disponibilidad, buscando una solución factible cercana a la original. |

@@ -33,9 +33,21 @@ peor caso. Las heurísticas siguientes solo reducen el árbol en la práctica:
   vecino o no). Si algún dominio queda vacío, la rama no puede completarse y se
   retrocede de inmediato, sin descender. Los cambios se guardan en una pila
   (trail) y se revierten al deshacer: no se copian dominios por nodo.
-* **Orden de valores** ``f_incremental``: los valores del dominio se prueban
-  por costo blando incremental creciente (horas extremas, huecos y carga), de
-  modo que las primeras soluciones halladas ya sean buenas.
+* **Orden de valores** (por defecto ``lcv``). MRV elige la *variable* con
+  criterio "fail-first" (la más difícil primero); el orden de valores debe ser
+  el opuesto, "succeed-first": probar primero el valor que deja más libertad.
+
+  - ``lcv`` (*least constraining value*): los valores de x se ordenan por la
+    tupla (posiciones que el valor eliminaría de los dominios actuales de las
+    variables pendientes, delta blando, índice original). Se cuentan los
+    horarios (día, franja) distintos que perderían los vecinos de x en Γ
+    (traslape temporal; igual que ``restr`` de la búsqueda Avara) y las
+    posiciones de bloques no vecinos no virtuales (mismo salón y traslape),
+    como haría el forward checking. Se agrupa por (día, franja) con sumas
+    prefijas, sin comparar todos los pares de posiciones.
+  - ``f_incremental``: por costo blando incremental creciente (horas extremas,
+    huecos y carga), de modo que las primeras soluciones ya sean buenas.
+  - ``natural``: el orden del dominio.
 
 Saltar bloques (variable sin dominio)
 -------------------------------------
@@ -51,6 +63,15 @@ búsqueda se hace en **dos fases**:
   branch & bound: no se exploran ramas cuyos saltos (más las variables que ya
   tienen dominio vacío, que forzosamente se saltarán) igualen o superen los del
   mejor estado completo hallado. Así se devuelve el mínimo número de saltos.
+
+Presupuesto por fases
+---------------------
+Si ``permitir_saltar``, la fase A solo puede gastar la fracción
+``fraccion_fase_a`` (0 < f <= 1) de ``max_nodos`` y ``max_segundos``; si la
+agota sin solución completa se pasa a la fase B con lo que quede del
+presupuesto total (el conteo de nodos y tiempo no se reinicia, así que el
+``Resultado`` respeta siempre los ``Limites`` originales). Sin saltos, la fase
+A usa todo el presupuesto.
 
 Modos
 -----
@@ -89,14 +110,14 @@ from planificador.core import costo
 from planificador.core.acciones import aplicar_en_sitio
 from planificador.core.conflictos import construir_conflictos
 from planificador.core.estado import Estado
-from planificador.core.modelo import Anadir, Instancia, Posicion
+from planificador.core.modelo import Anadir, Eliminar, Instancia, Posicion
 
 from .base import Limites, Presupuesto, Resultado, Solver, Traza
 from .comun import (consistente, dominio_consistente, elegir_mrv,
                     resultado_desde)
 
 MODOS = ("primera", "optimizar")
-ORDENES = ("f_incremental", "natural")
+ORDENES = ("lcv", "f_incremental", "natural")
 INFINITO = float("inf")
 
 
@@ -128,6 +149,9 @@ class _Busqueda:
         self.extrema = [fr.extrema for fr in instancia.franjas]
         self.inicial = dict(estado.asignacion)
         self.motivo: Optional[str] = None
+        # Tope de la fase A: (nodos, segundos) absolutos o None.
+        self.tope_fase: Optional[tuple] = None
+        self.fase_agotada = False
         # Dominios de las variables pendientes (aún no decididas).
         self.dom = {m: dominio_consistente(estado, m)
                     for m in sorted(estado.sin_ubicar())}
@@ -204,13 +228,94 @@ class _Busqueda:
                                           - max(0, len(ocup) - tope))
         return total
 
+    def _restricciones(self, x, valores) -> list:
+        """Posiciones que cada valor de x quitaría a los dominios pendientes.
+
+        Cuenta lo que podaría ``_filtrar`` con una diferencia deliberada: de
+        cada vecino en Γ se cuentan los horarios (día, franja) distintos que
+        perdería, no sus posiciones (un horario con 5 salones cuenta 1), como
+        hace ``restr`` en la búsqueda Avara; contarlas todas sesga la
+        elección hacia horarios con pocos salones y atasca la búsqueda. Los
+        bloques no vecinos sí se cuentan por posición (mismo salón). Se
+        agrupa: para cada duración y día se acumulan los inicios en un
+        arreglo con sumas prefijas, y cada valor consulta un rango.
+        """
+        inst = self.inst
+        nf = inst.num_franjas
+        dx = inst.bloque[x].duracion
+        vecinos = self.gamma[x]
+        bloque = inst.bloque
+        tiempo: dict = {}     # (du, dia) -> inicios por franja (vecinos)
+        salon: dict = {}      # (du, salon, dia) -> inicios por franja
+        for u, dom_u in self.dom.items():
+            if not dom_u:
+                continue
+            du = bloque[u].duracion
+            if u in vecinos:
+                destino, pref = tiempo, ()
+            elif not bloque[u].virtual:
+                destino, pref = salon, None
+            else:
+                continue
+            vistos = set()
+            for q in dom_u:
+                if pref is not None:
+                    # Vecinos en Γ: solo importa el horario, no el salón
+                    # (cada (día, franja) cuenta una vez por vecino).
+                    if (q.dia, q.franja) in vistos:
+                        continue
+                    vistos.add((q.dia, q.franja))
+                if pref is None:
+                    if inst.salon[q.salon].virtual:
+                        continue
+                    clave = (du, q.salon, q.dia)
+                else:
+                    clave = (du, q.dia)
+                arr = destino.get(clave)
+                if arr is None:
+                    arr = destino[clave] = [0] * (nf + 1)
+                arr[q.franja + 1] += 1
+        for destino in (tiempo, salon):
+            for arr in destino.values():
+                for i in range(1, nf + 1):
+                    arr[i] += arr[i - 1]
+        res = []
+        memo: dict = {}
+        for p in valores:
+            fisico = not inst.salon[p.salon].virtual
+            clave_p = (p.dia, p.franja, p.salon if fisico else None)
+            tot = memo.get(clave_p)
+            if tot is None:
+                # q se traslapa con p si q.franja en (p.franja - du, fin_p).
+                tot = 0
+                hi = min(p.franja + dx, nf)
+                for (du, dia), arr in tiempo.items():
+                    if dia == p.dia:
+                        lo = max(p.franja - du + 1, 0)
+                        tot += arr[hi] - arr[lo]
+                if fisico:
+                    for (du, sal, dia), arr in salon.items():
+                        if dia == p.dia and sal == p.salon:
+                            lo = max(p.franja - du + 1, 0)
+                            tot += arr[hi] - arr[lo]
+                memo[clave_p] = tot
+            res.append(tot)
+        return res
+
     def _ordenar(self, bloque_id, valores) -> list:
-        if self.s.orden_valores != "f_incremental" or len(valores) < 2:
+        orden = self.s.orden_valores
+        if orden == "natural" or len(valores) < 2:
             return list(valores)
         cache: dict = {}
-        claves = [(self._delta(bloque_id, p, cache), i)
-                  for i, p in enumerate(valores)]
-        return [valores[i] for _, i in sorted(claves)]
+        if orden == "lcv":
+            restr = self._restricciones(bloque_id, valores)
+            claves = [(restr[i], self._delta(bloque_id, p, cache), i)
+                      for i, p in enumerate(valores)]
+        else:
+            claves = [(self._delta(bloque_id, p, cache), i)
+                      for i, p in enumerate(valores)]
+        claves.sort()
+        return [valores[c[-1]] for c in claves]
 
     # ------------------------------------------------------------------
     # forward checking
@@ -285,6 +390,40 @@ class _Busqueda:
         if self.s.modo == "primera" and saltos == 0:
             self.motivo = "meta" if v == 0 else "agotado"
 
+    def _fase_agotada(self) -> bool:
+        """True si se agotó el tope propio de la fase A (no el total).
+
+        El tope solo existe para dejarle presupuesto a la fase B. Si ya hay
+        una solución completa, la fase B no se ejecutará, así que la fase A
+        conserva todo el presupuesto (sin esto, ``optimizar`` se cortaba y
+        reportaba "agotado" como si hubiera probado optimalidad).
+        """
+        if self.tope_fase is None or self.mejor_F_comp < INFINITO:
+            return False
+        nodos, seg = self.tope_fase
+        if ((nodos is not None and self.pres.nodos_expandidos >= nodos)
+                or (seg is not None and self.pres.transcurrido() >= seg)):
+            self.fase_agotada = True
+            return True
+        return False
+
+    def reiniciar_fase(self) -> None:
+        """Deshace lo ubicado por la fase A y recalcula los dominios."""
+        est = self.estado
+        for m in sorted(est.asignacion):
+            if m not in self.inicial:
+                pos = est.asignacion[m]
+                aplicar_en_sitio(est, Eliminar(m))
+                self.traza.registrar("del", bloque=m, posicion=pos)
+        self.dom = {m: dominio_consistente(est, m)
+                    for m in sorted(est.sin_ubicar())}
+        self.vacios = sum(1 for d in self.dom.values() if not d)
+        self.trail = []
+        self.ext = sum(self._extremas(m, p)
+                       for m, p in est.asignacion.items())
+        self.tope_fase = None
+        self.fase_agotada = False
+
     def buscar(self, saltos, prof) -> bool:
         """Devuelve True si hay que detener toda la búsqueda."""
         if prof > self.prof_max:
@@ -309,6 +448,8 @@ class _Busqueda:
             motivo = self.pres.agotado()
             if motivo:
                 self.motivo = motivo
+                return True
+            if self._fase_agotada():
                 return True
             self.pres.nodos_expandidos += 1
             if not fc and not consistente(self.estado, x, p):
@@ -360,20 +501,26 @@ class Backtracking(Solver):
 
     def __init__(self, modo: str = "primera", mrv: bool = True,
                  forward_checking: bool = True, permitir_saltar: bool = True,
-                 orden_valores: str = "f_incremental"):
+                 orden_valores: str = "lcv",
+                 fraccion_fase_a: float = 0.7):
         if modo not in MODOS:
             raise ValueError(f"modo inválido: {modo}")
         if orden_valores not in ORDENES:
             raise ValueError(f"orden_valores inválido: {orden_valores}")
+        if not 0 < fraccion_fase_a <= 1:
+            raise ValueError(
+                f"fraccion_fase_a debe estar en (0, 1]: {fraccion_fase_a}")
         super().__init__(modo=modo, mrv=mrv,
                          forward_checking=forward_checking,
                          permitir_saltar=permitir_saltar,
-                         orden_valores=orden_valores)
+                         orden_valores=orden_valores,
+                         fraccion_fase_a=fraccion_fase_a)
         self.modo = modo
         self.mrv = mrv
         self.forward_checking = forward_checking
         self.permitir_saltar = permitir_saltar
         self.orden_valores = orden_valores
+        self.fraccion_fase_a = fraccion_fase_a
 
     def resolver(self, instancia: Instancia, estado_inicial=None,
                  limites: Limites = Limites()) -> Resultado:
@@ -385,11 +532,22 @@ class Backtracking(Solver):
         if necesario > limite_previo:
             sys.setrecursionlimit(necesario)
         try:
-            # Fase A: sin saltos (cota de saltos = 1).
+            # Fase A: sin saltos (cota de saltos = 1). Con saltos
+            # permitidos solo gasta una fracción del presupuesto.
+            if self.permitir_saltar:
+                f = self.fraccion_fase_a
+                b.tope_fase = (
+                    None if limites.max_nodos is None
+                    else limites.max_nodos * f,
+                    None if limites.max_segundos is None
+                    else limites.max_segundos * f)
             b.buscar(0, 0)
             # Fase B: permitir saltos, solo si A no halló nada completo.
             if (b.motivo is None and self.permitir_saltar
                     and b.mejor_F_comp == INFINITO):
+                if b.fase_agotada:
+                    b.reiniciar_fase()
+                b.tope_fase = None
                 b.cota_saltos = INFINITO
                 b.buscar(0, 0)
             if b.motivo is None:

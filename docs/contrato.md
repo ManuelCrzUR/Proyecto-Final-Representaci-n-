@@ -137,3 +137,19 @@ Piezas compartidas del orquestador, que las demás piezas deben usar en lugar de
 | 4.1 | M | Sonnet | `planificador/experimentos/**` (runner.py, graficas.py, configs/*.json), `tests/test_experimentos.py` |
 | 4.1 | N | Sonnet | `planificador/app/**`, `tests/test_app.py` |
 | 4.2 | O | Haiku | `README.md` |
+
+## Sprint 5: correcciones de la revisión (contrato)
+
+- `algoritmos/comun.py` (orquestador): `dominio_unario` parte de un dominio base memoizado por bloque en `instancia.__dict__["_dominio_base_comun"]` (posiciones legales en estado vacío que respetan A y W) y solo filtra por ocupación de salón. Mismo resultado y mismo orden que antes (test de equivalencia en `tests/test_algoritmos_base.py`).
+- `Backtracking(orden_valores=...)` acepta `"lcv"` (por defecto), `"f_incremental"` y `"natural"`, y además `fraccion_fase_a: float = 0.7`.
+- `reparar(...)`: aplicar en orden la traza devuelta desde `inicial` (vigente menos inválidos) termina exactamente en `resultado.asignacion`, sin depender de `asignacion_final`.
+- `planificador/datos_demo.py` contiene las instancias mini. `tests/fixtures/instancias_mini.py` solo las reexporta. El paquete `planificador` no importa `tests`.
+
+## Dueños: sprint 5
+
+| Ola | Agente | Modelo | Archivos |
+|---|---|---|---|
+| 5.0 | Orquestador | Opus | `algoritmos/comun.py`, `tests/test_algoritmos_base.py`, `docs/contrato.md` |
+| 5.1 | P | Sonnet | `algoritmos/backtracking.py`, `tests/test_backtracking.py` |
+| 5.1 | Q | Sonnet | `algoritmos/reparacion.py`, `tests/test_reparacion.py` |
+| 5.1 | R | Haiku | `planificador/datos_demo.py`, `tests/fixtures/instancias_mini.py`, `app/pagina_instancia.py`, `algoritmos/informada.py` (solo `Avara`), `algoritmos/registro.py`, `README.md` |

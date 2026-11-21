@@ -32,7 +32,8 @@ REGISTRO = {
     ),
     "a_estrella": EntradaSolver(
         AEstrella,
-        "A* con heurística admisible y consistente (óptimo en costo aditivo).",
+        "A* con heurística admisible y consistente: óptimo respecto del costo "
+        "aditivo g (no incluye huecos, dispersión ni cambio de sede).",
         {"peso_h": 1.0},
         {"peso_h": ("float", (1.0, 5.0))},
     ),

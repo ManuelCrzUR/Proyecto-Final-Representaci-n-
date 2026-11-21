@@ -314,3 +314,94 @@ def test_parametros_y_extra():
         Backtracking(modo="otro")
     with pytest.raises(ValueError):
         Backtracking(orden_valores="otro")
+
+
+# ----------------------------------------------------------------------
+# Sprint 5: orden LCV y presupuesto de la fase A
+# ----------------------------------------------------------------------
+
+def test_lcv_resuelve_instancia_ajustada():
+    inst, _ = generar_instancia(50, 1, prob_disponible=0.1, prob_ventana=0.3)
+    r = Backtracking().resolver(inst, limites=Limites(max_segundos=20))
+    assert r.parametros["orden_valores"] == "lcv"
+    assert r.v == 0 and r.terminado_por == "meta"
+    assert _valido(inst, r) == 0
+    assert r.tiempo_s < 10
+
+
+@pytest.mark.parametrize("orden", ["lcv", "f_incremental"])
+@pytest.mark.parametrize("n,semilla", [(10, 1), (20, 2), (30, 3)])
+def test_ordenes_dan_soluciones_validas(orden, n, semilla):
+    inst, _ = generar_instancia(n, semilla)
+    r = Backtracking(orden_valores=orden).resolver(inst, limites=HOLGADO)
+    assert _valido(inst, r) == r.v
+    assert r.v == 0 and r.terminado_por == "meta"
+
+
+def test_lcv_optimizar_valido():
+    inst, _ = generar_instancia(10, 4)
+    r = Backtracking(modo="optimizar", orden_valores="lcv").resolver(
+        inst, limites=Limites(max_nodos=20_000, max_segundos=20))
+    assert _valido(inst, r) == r.v
+
+
+def test_fase_b_corre_aunque_fase_a_agote_su_fraccion():
+    fx = mini_infactible()
+    lim = Limites(max_nodos=10, max_segundos=30)
+    r = Backtracking(permitir_saltar=True, fraccion_fase_a=0.1).resolver(
+        fx["instancia"], limites=lim)
+    # La fase A solo dispone de 1 nodo: la fase B es quien halla v mínimo.
+    assert r.v == fx["v_minimo"] == 1
+    assert r.extra["saltados"] == 1
+    assert r.nodos_expandidos <= lim.max_nodos
+    assert r.terminado_por == "agotado"
+    assert _valido(fx["instancia"], r) == 1
+    # La traza sigue reconstruyendo el estado final tras el reinicio.
+    inicial = Estado(fx["instancia"])
+    for e in r.traza.eventos:
+        if e.tipo == "add":
+            aplicar_en_sitio(inicial, Anadir(e.bloque, e.posicion))
+        elif e.tipo == "del":
+            aplicar_en_sitio(inicial, Eliminar(e.bloque))
+    assert dict(inicial.asignacion) == r.asignacion
+
+
+def test_fase_b_respeta_limite_total_de_nodos():
+    inst, _ = generar_instancia(30, 7, prob_disponible=0.05)
+    lim = Limites(max_nodos=300, max_segundos=30)
+    r = Backtracking(fraccion_fase_a=0.5).resolver(inst, limites=lim)
+    assert r.nodos_expandidos <= lim.max_nodos
+    assert r.terminado_por in ("meta", "agotado", "limite_nodos")
+    assert _valido(inst, r) == r.v
+
+
+def test_sin_saltar_fase_a_usa_todo_el_presupuesto():
+    inst, _ = generar_instancia(30, 7, prob_disponible=0.05)
+    lim = Limites(max_nodos=300, max_segundos=30)
+    r = Backtracking(permitir_saltar=False, fraccion_fase_a=0.1).resolver(
+        inst, limites=lim)
+    assert r.nodos_expandidos <= lim.max_nodos
+    if r.terminado_por == "limite_nodos":
+        assert r.nodos_expandidos == lim.max_nodos
+
+
+@pytest.mark.parametrize("fraccion", [0, -0.1, 1.5])
+def test_fraccion_fase_a_invalida(fraccion):
+    with pytest.raises(ValueError):
+        Backtracking(fraccion_fase_a=fraccion)
+    assert Backtracking(fraccion_fase_a=1).parametros[
+        "fraccion_fase_a"] == 1
+
+
+def test_optimizar_no_se_corta_por_el_tope_de_fase_a():
+    """Con solución completa, la fase A usa todo el presupuesto y no
+    reporta "agotado" por el tope que solo existe para la fase B."""
+    from planificador.algoritmos.base import Limites
+    from planificador.io_datos.sintetico import generar_instancia
+
+    inst, _ = generar_instancia(20, 1)
+    lim = Limites(max_nodos=3000, max_segundos=None)
+    res = Backtracking(modo="optimizar").resolver(inst, None, lim)
+    assert res.exito
+    assert res.nodos_expandidos >= 3000
+    assert res.terminado_por == "limite_nodos"
