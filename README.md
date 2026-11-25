@@ -244,19 +244,25 @@ Algunas pruebas están marcadas como `integracion` y se omiten si no existen los
 - Las columnas de tiempo (`tiempo_s`) dependen del reloj de la máquina y no son reproducibles. El resto de columnas sí lo son.
 - `salidas/` está excluido de git (`.gitignore`), igual que los datos reales.
 
-## Capturas
+## Capturas de pantalla
 
-### Instancia
+### 1. Generación y edición de instancias
 
-Pendiente: insertar una captura de la página Instancia.
+La interfaz permite generar instancias sintéticas, cargar archivos JSON, consultar sus características y modificar sus componentes.
 
-### Ejecutar y animar
+![Generación y edición de instancias](docs/capturas/instancia.png)
 
-Pendiente: insertar una captura de la página Ejecutar y animar.
+### 2. Ejecución y animación
 
-### Comparar
+La aplicación permite ejecutar los algoritmos de búsqueda, visualizar el proceso de exploración y observar la solución final mediante controles de reproducción paso a paso.
 
-Pendiente: insertar una captura de la página Comparar.
+![Ejecución y animación](docs/capturas/ejecutar.png)
+
+### 3. Comparación de algoritmos
+
+Se comparan diferentes algoritmos sobre una misma instancia mediante métricas de rendimiento, tablas de resultados, gráficas y visualización de horarios.
+
+![Comparación de algoritmos](docs/capturas/comparar.png)
 
 ## Estado del proyecto
 
