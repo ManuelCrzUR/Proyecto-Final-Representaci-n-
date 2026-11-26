@@ -118,7 +118,7 @@ class BeamSearch(Solver):
         estado_final = ctx.estado_de(final)
         extra = {"saltados": final.n_saltados, "niveles": niveles,
                  "ancho": self.ancho, "max_haz": max_haz,
-                 "max_candidatos": max_candidatos, 
+                 "max_candidatos": max_candidatos,
                  "max_estructura": max_estructura
                  }
         res = resultado_desde(self.nombre, estado_final, pres, terminado,

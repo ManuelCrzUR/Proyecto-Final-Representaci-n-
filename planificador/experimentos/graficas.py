@@ -37,9 +37,9 @@ ETIQUETAS = {
     "tiempo_s": "Tiempo de ejecución (s)", "n": "Número de bloques (n)",
     "nodos_expandidos": "Nodos expandidos", "exito": "Tasa de éxito (v = 0)",
     "F": "Costo F (solo corridas exitosas)", "estabilidad": "Estabilidad",
-    "movidos": "Bloques movidos" , "nodos_generados": "Nodos generados",
+    "movidos": "Bloques movidos", "nodos_generados": "Nodos generados",
     "longitud_solucion": "Bloques ubicados",
-    "memoria_max_aprox": "Memoria máxima aproximada",}
+    "memoria_max_aprox": "Memoria máxima aproximada", }
 NOMBRE_ESC = {"construccion": "Construcción", "reparacion": "Reparación"}
 
 
@@ -67,7 +67,7 @@ def _lineas(ax, df, x, y, colores, log_y=False, por="algoritmo"):
     for clave, sub in _agregar(df.dropna(subset=[y]), x, y, por).groupby(por):
         sub = sub.sort_values(x)
         err = sub["std"]
-        if y in("exito", "estabilidad"):  # una proporción no sale de [0, 1]
+        if y in ("exito", "estabilidad"):  # una proporción no sale de [0, 1]
             err = [sub["std"].clip(upper=sub["mean"]),
                    sub["std"].clip(upper=1 - sub["mean"])]
         ax.errorbar(sub[x], sub["mean"], yerr=err, marker="o",
@@ -77,7 +77,7 @@ def _lineas(ax, df, x, y, colores, log_y=False, por="algoritmo"):
     if log_y and hay:
         ax.set_yscale("log")
     if y in ("exito", "estabilidad"):
-        ax.set_ylim(0, 1)    
+        ax.set_ylim(0, 1)
     ax.set_xlabel(ETIQUETAS.get(x, x))
     ax.set_ylabel(ETIQUETAS.get(y, y) + (" (escala log)" if log_y else ""))
     ax.grid(alpha=0.3)

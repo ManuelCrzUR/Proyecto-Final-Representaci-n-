@@ -549,4 +549,3 @@ def render() -> None:
 
     _seccion_gamma(inst)
     _seccion_edicion(inst)
-

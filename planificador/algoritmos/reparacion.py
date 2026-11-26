@@ -260,7 +260,7 @@ def reparar(instancia: Instancia, asignacion_vigente: dict, solver: Solver,
         ]
         if valores:
             extra_res[clave] = max(valores)
-            
+
     extra_res.update({
         "invalidos": len(invalidos),
         "liberados": liberados_final,
