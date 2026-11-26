@@ -57,6 +57,9 @@ class BeamSearch(Solver):
         ctx = Contexto(instancia, estado_inicial)
         raiz = ctx.raiz()
         haz = [raiz]
+        max_haz = len(haz)
+        max_candidatos = 0
+        max_estructura = len(haz)
         mejor = raiz
         niveles = 0
         terminado = "meta"
@@ -79,7 +82,11 @@ class BeamSearch(Solver):
                 pres.nodos_generados += len(hijos)
                 for hijo in hijos:
                     candidatos.append(hijo)
-                    mejor = mejor_visto(mejor, hijo)
+                max_candidatos = max(max_candidatos, len(candidatos))
+                max_estructura = max(
+                    max_estructura, len(haz) + len(candidatos)
+                )
+                mejor = mejor_visto(mejor, hijo)
             if interrumpido:
                 break
             ordenados = sorted(
@@ -96,6 +103,8 @@ class BeamSearch(Solver):
                 vistos.add(clave)
                 haz.append(nodo)
             niveles += 1
+            max_haz = max(max_haz, len(haz))
+            max_estructura = max(max_estructura, len(haz))
             descartados = len(candidatos) - len(haz)
             traza.registrar("frontera", tam_frontera=len(haz),
                             profundidad=niveles)
@@ -108,7 +117,10 @@ class BeamSearch(Solver):
         final = hoja if hoja is not None else mejor
         estado_final = ctx.estado_de(final)
         extra = {"saltados": final.n_saltados, "niveles": niveles,
-                 "ancho": self.ancho}
+                 "ancho": self.ancho, "max_haz": max_haz,
+                 "max_candidatos": max_candidatos, 
+                 "max_estructura": max_estructura
+                 }
         res = resultado_desde(self.nombre, estado_final, pres, terminado,
                               traza, self.parametros, extra)
         if hoja is not None and res.exito:

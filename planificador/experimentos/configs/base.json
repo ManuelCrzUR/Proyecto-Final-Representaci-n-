@@ -36,6 +36,18 @@
     {
       "nombre": "backtracking",
       "parametros": {
+        "modo": "primera",
+        "mrv": false,
+        "forward_checking": false,
+        "permitir_saltar": false,
+        "orden_valores": "natural"
+      },
+      "etiqueta": "dfs_no_informada",
+      "max_n": 20
+    },
+    {
+      "nombre": "backtracking",
+      "parametros": {
         "modo": "optimizar"
       },
       "etiqueta": "backtracking_opt",

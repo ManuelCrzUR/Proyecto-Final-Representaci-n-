@@ -49,6 +49,11 @@ COLUMNAS = [
     "config", "escenario", "dificultad", "n", "semilla", "algoritmo",
     "parametros", "exito", "v", "v_sin_ubicar", "v_disp", "v_vent",
     "v_conf", "f", "F", "tiempo_s", "nodos_expandidos", "nodos_generados",
+    "longitud_solucion", "bloques_totales",
+    "memoria_max_aprox", "tipo_memoria",
+    "max_frontera", "max_haz", "max_candidatos",
+    "max_estructura", "profundidad_max",
+    "optimo_demostrado", "criterio_optimalidad",
     "terminado_por", "saltados", "invalidos", "liberados", "movidos",
     "estabilidad", "v_validador", "inconsistente", "eventos_traza",
 ]
@@ -106,31 +111,116 @@ def _n_saltados(extra: dict) -> int:
 
 
 def _fila(cfg, escenario, dificultad, n, semilla, alg, inst, res) -> dict:
-    """Arma la fila de resultados y contrasta v con el validador."""
+    """Arma la fila de resultados y registra las métricas de búsqueda."""
     viol = res.violaciones
     rep = validar(inst, res.asignacion)
     v_val = rep.violaciones.total
     extra = res.extra
+    parametros = alg.get("parametros", {})
+    nombre = alg["nombre"]
     rep_fila = escenario == "reparacion"
+
+    # Longitud de la solución.
+    longitud = len(res.asignacion)
+    bloques_totales = len(inst.bloque)
+
+    # Métricas específicas de cada algoritmo.
+    max_frontera = extra.get("max_frontera")
+    max_haz = extra.get("max_haz")
+    max_candidatos = extra.get("max_candidatos")
+    max_estructura = extra.get("max_estructura")
+    profundidad_max = extra.get("profundidad_max")
+
+    # Memoria aproximada según la estructura utilizada.
+    if nombre in ("a_estrella", "avara"):
+        memoria = max_frontera
+        tipo_memoria = "nodos_en_frontera"
+    elif nombre == "beam":
+        memoria = max_estructura
+        tipo_memoria = "haz_y_candidatos"
+    elif nombre == "backtracking":
+        memoria = profundidad_max
+        tipo_memoria = "profundidad_recursion"
+    else:
+        memoria = None
+        tipo_memoria = "no_disponible"
+
+    # Determinar si se demostró optimalidad respecto al costo total F.
+    optimo = False
+    criterio = "No garantiza optimalidad"
+
+    if nombre == "backtracking":
+        if parametros.get("modo", "primera") == "optimizar":
+            if res.terminado_por == "agotado":
+                optimo = bool(res.exito)
+                criterio = (
+                    "Costo F: branch and bound agotado"
+                    if res.exito else
+                    "No se encontró solución factible"
+                )
+            else:
+                criterio = (
+                    f"No demostrado: {res.terminado_por}"
+                )
+        else:
+            criterio = "Primera solución: no garantiza F mínimo"
+
+    elif nombre == "a_estrella":
+        if parametros.get("peso_h", 1.0) == 1.0:
+            criterio = "Óptimo respecto a g, no necesariamente a F"
+        else:
+            criterio = "A* ponderado: no garantiza optimalidad"
+
+    elif nombre == "avara":
+        criterio = "Heurística no admisible"
+
+    elif nombre == "beam":
+        criterio = "Ancho limitado: no garantiza optimalidad"
+        # La reparación por vecindad no demuestra optimalidad global.
+    if rep_fila:
+        optimo = False
+        criterio = (
+            "Reparación por vecindad: no demuestra optimalidad global"
+        )
+
     return {
-        "config": cfg["nombre"], "escenario": escenario,
-        "dificultad": dificultad, "n": n, "semilla": semilla,
-        "algoritmo": alg.get("etiqueta") or alg["nombre"],
-        "parametros": json.dumps(alg.get("parametros", {}),
-                                 sort_keys=True),
-        "exito": bool(res.exito), "v": viol.total,
-        "v_sin_ubicar": viol.sin_ubicar, "v_disp": viol.disponibilidad,
-        "v_vent": viol.ventana, "v_conf": viol.conflicto,
-        "f": res.f, "F": res.F, "tiempo_s": res.tiempo_s,
+        "config": cfg["nombre"],
+        "escenario": escenario,
+        "dificultad": dificultad,
+        "n": n,
+        "semilla": semilla,
+        "algoritmo": alg.get("etiqueta") or nombre,
+        "parametros": json.dumps(parametros, sort_keys=True),
+        "exito": bool(res.exito),
+        "v": viol.total,
+        "v_sin_ubicar": viol.sin_ubicar,
+        "v_disp": viol.disponibilidad,
+        "v_vent": viol.ventana,
+        "v_conf": viol.conflicto,
+        "f": res.f,
+        "F": res.F,
+        "tiempo_s": res.tiempo_s,
         "nodos_expandidos": res.nodos_expandidos,
         "nodos_generados": res.nodos_generados,
+        "longitud_solucion": longitud,
+        "bloques_totales": bloques_totales,
+        "memoria_max_aprox": memoria,
+        "tipo_memoria": tipo_memoria,
+        "max_frontera": max_frontera,
+        "max_haz": max_haz,
+        "max_candidatos": max_candidatos,
+        "max_estructura": max_estructura,
+        "profundidad_max": profundidad_max,
+        "optimo_demostrado": optimo,
+        "criterio_optimalidad": criterio,
         "terminado_por": res.terminado_por,
         "saltados": _n_saltados(extra),
         "invalidos": extra.get("invalidos") if rep_fila else None,
         "liberados": extra.get("liberados") if rep_fila else None,
         "movidos": extra.get("movidos") if rep_fila else None,
         "estabilidad": extra.get("estabilidad") if rep_fila else None,
-        "v_validador": v_val, "inconsistente": v_val != viol.total,
+        "v_validador": v_val,
+        "inconsistente": v_val != viol.total,
         "eventos_traza": len(res.traza),
     }
 

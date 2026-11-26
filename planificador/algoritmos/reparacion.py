@@ -242,6 +242,25 @@ def reparar(instancia: Instancia, asignacion_vigente: dict, solver: Solver,
         [(r, n, ini, res.traza) for r, n, res, ini in resultados],
         limites, r_mejor, mejor.asignacion)
     extra_res = dict(mejor.extra)
+    # Conservar el máximo de memoria de todos los intentos.
+    metricas_max = (
+        "max_frontera",
+        "max_haz",
+        "max_candidatos",
+        "max_estructura",
+        "profundidad_max",
+    )
+
+    for clave in metricas_max:
+        valores = [
+            intento.extra[clave]
+            for _, _, intento, _ in resultados
+            if clave in intento.extra
+            and intento.extra[clave] is not None
+        ]
+        if valores:
+            extra_res[clave] = max(valores)
+            
     extra_res.update({
         "invalidos": len(invalidos),
         "liberados": liberados_final,

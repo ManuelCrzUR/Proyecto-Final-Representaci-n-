@@ -21,17 +21,25 @@ import pandas as pd  # noqa: E402
 from matplotlib.ticker import NullFormatter  # noqa: E402
 
 GRUPO = ["escenario", "dificultad", "n", "algoritmo"]
-METRICAS = ["v", "F", "f", "tiempo_s", "nodos_expandidos", "movidos",
-            "estabilidad"]
+METRICAS = [
+    "v", "F", "f", "tiempo_s",
+    "nodos_expandidos", "nodos_generados",
+    "longitud_solucion", "memoria_max_aprox",
+    "movidos", "estabilidad"
+]
+
 COLUMNAS_TABLA = (
-    GRUPO + ["corridas", "tasa_exito"]
+    GRUPO + ["corridas", "tasa_exito", "tasa_optimalidad"]
     + [f"{m}_{s}" for m in METRICAS for s in ("media", "desv")]
-    + ["F_exito_media", "F_exito_desv"])
+    + ["F_exito_media", "F_exito_desv"]
+)
 ETIQUETAS = {
     "tiempo_s": "Tiempo de ejecución (s)", "n": "Número de bloques (n)",
     "nodos_expandidos": "Nodos expandidos", "exito": "Tasa de éxito (v = 0)",
     "F": "Costo F (solo corridas exitosas)", "estabilidad": "Estabilidad",
-    "movidos": "Bloques movidos"}
+    "movidos": "Bloques movidos" , "nodos_generados": "Nodos generados",
+    "longitud_solucion": "Bloques ubicados",
+    "memoria_max_aprox": "Memoria máxima aproximada",}
 NOMBRE_ESC = {"construccion": "Construcción", "reparacion": "Reparación"}
 
 
@@ -59,7 +67,7 @@ def _lineas(ax, df, x, y, colores, log_y=False, por="algoritmo"):
     for clave, sub in _agregar(df.dropna(subset=[y]), x, y, por).groupby(por):
         sub = sub.sort_values(x)
         err = sub["std"]
-        if y == "exito":  # una proporción no sale de [0, 1]
+        if y in("exito", "estabilidad"):  # una proporción no sale de [0, 1]
             err = [sub["std"].clip(upper=sub["mean"]),
                    sub["std"].clip(upper=1 - sub["mean"])]
         ax.errorbar(sub[x], sub["mean"], yerr=err, marker="o",
@@ -68,6 +76,8 @@ def _lineas(ax, df, x, y, colores, log_y=False, por="algoritmo"):
         hay = True
     if log_y and hay:
         ax.set_yscale("log")
+    if y in ("exito", "estabilidad"):
+        ax.set_ylim(0, 1)    
     ax.set_xlabel(ETIQUETAS.get(x, x))
     ax.set_ylabel(ETIQUETAS.get(y, y) + (" (escala log)" if log_y else ""))
     ax.grid(alpha=0.3)
@@ -185,6 +195,14 @@ def generar_graficas(csv, carpeta) -> list:
         _panel(cons, "nodos_expandidos",
                "Nodos expandidos vs tamaño (construcción)",
                "nodos_vs_n.png", carpeta, colores, log_y=True),
+        _panel(cons, "nodos_generados",
+               "Nodos generados vs tamaño (construcción)",
+               "nodos_generados_vs_n.png",
+               carpeta, colores, log_y=True),
+        _panel(df, "longitud_solucion",
+               "Bloques ubicados vs tamaño",
+               "longitud_solucion_vs_n.png",
+               carpeta, colores),
         _panel(exitosos, "F", "Costo F vs tamaño (solo corridas exitosas)",
                "F_vs_n.png", carpeta, colores),
         _panel(rep, "estabilidad", "Reparación: estabilidad vs tamaño",
@@ -214,6 +232,7 @@ def tabla_resumen(csv, salida=None) -> pd.DataFrame:
         fila = dict(zip(GRUPO, clave))
         fila["corridas"] = len(sub)
         fila["tasa_exito"] = float(sub["exito"].mean())
+        fila["tasa_optimalidad"] = float(sub["optimo_demostrado"].astype(bool).mean())
         for m in METRICAS:
             fila[f"{m}_media"] = sub[m].mean()
             fila[f"{m}_desv"] = sub[m].std(ddof=1) if sub[m].count() > 1 \
@@ -234,30 +253,66 @@ def tabla_resumen(csv, salida=None) -> pd.DataFrame:
 
 
 def _markdown(tabla: pd.DataFrame) -> str:
-    """Tabla Markdown con medias ± desviaciones, una por escenario."""
+    """Genera tablas Markdown completas para el informe."""
     partes = []
-    cab = ["dificultad", "n", "algoritmo", "corridas", "éxito", "F (éxitos)",
-           "v", "tiempo (s)", "nodos exp."]
+
+    cab = [
+        "Dificultad", "Bloques", "Algoritmo", "Corridas",
+        "Éxito", "Optimalidad", "Costo F (exitosos)",
+        "Violaciones", "Tiempo (s)", "Nodos exp.",
+        "Nodos gen.", "Bloques asignados", "Memoria aprox."
+    ]
+
     for esc, sub in tabla.groupby("escenario"):
-        extra = esc == "reparacion"
-        c = cab + (["movidos", "estabilidad"] if extra else [])
+        es_reparacion = esc == "reparacion"
+
+        columnas = cab.copy()
+        if es_reparacion:
+            columnas += ["Bloques movidos", "Estabilidad"]
+
         partes.append(f"### {NOMBRE_ESC.get(esc, esc)}\n")
-        partes.append("| " + " | ".join(c) + " |")
-        partes.append("|" + "---|" * len(c))
+        partes.append("| " + " | ".join(columnas) + " |")
+        partes.append("|" + "---|" * len(columnas))
+
         for _, r in sub.iterrows():
-            vals = [r["dificultad"], str(r["n"]), r["algoritmo"],
-                    str(r["corridas"]), f"{100 * r['tasa_exito']:.0f} %",
-                    _fmt(r["F_exito_media"], r["F_exito_desv"], 1),
-                    _fmt(r["v_media"], r["v_desv"], 1),
-                    _fmt(r["tiempo_s_media"], r["tiempo_s_desv"], 3),
-                    _fmt(r["nodos_expandidos_media"],
-                         r["nodos_expandidos_desv"], 0)]
-            if extra:
-                vals += [_fmt(r["movidos_media"], r["movidos_desv"], 1),
-                         _fmt(r["estabilidad_media"],
-                              r["estabilidad_desv"], 2)]
-            partes.append("| " + " | ".join(vals) + " |")
+            valores = [
+                r["dificultad"],
+                str(r["n"]),
+                r["algoritmo"],
+                str(r["corridas"]),
+                f"{100 * r['tasa_exito']:.0f} %",
+                f"{100 * r['tasa_optimalidad']:.0f} %",
+                _fmt(r["F_exito_media"], r["F_exito_desv"], 2),
+                _fmt(r["v_media"], r["v_desv"], 1),
+                _fmt(r["tiempo_s_media"], r["tiempo_s_desv"], 3),
+                _fmt(r["nodos_expandidos_media"],
+                     r["nodos_expandidos_desv"], 0),
+                _fmt(r["nodos_generados_media"],
+                     r["nodos_generados_desv"], 0),
+                _fmt(r["longitud_solucion_media"],
+                     r["longitud_solucion_desv"], 1),
+                _fmt(r["memoria_max_aprox_media"],
+                     r["memoria_max_aprox_desv"], 1),
+            ]
+
+            if es_reparacion:
+                valores += [
+                    _fmt(r["movidos_media"], r["movidos_desv"], 1),
+                    _fmt(r["estabilidad_media"],
+                         r["estabilidad_desv"], 2)
+                ]
+
+            partes.append("| " + " | ".join(valores) + " |")
+
         partes.append("")
+
+    partes.append(
+        "**Nota:** La memoria es una aproximación basada en estructuras "
+        "diferentes según el algoritmo; no representa bytes directamente "
+        "comparables. La optimalidad corresponde a la garantía demostrada "
+        "por cada ejecución."
+    )
+
     return "\n".join(partes)
 
 
