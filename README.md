@@ -39,7 +39,13 @@ Las claves de los algoritmos son las definidas en `planificador/algoritmos/regis
 ├── setup.cfg               configuración de flake8 (líneas de 88 caracteres)
 ├── .gitignore              excluye .venv/, salidas/ y los datos reales
 ├── docs/
-│   └── contrato.md         reglas de desarrollo y firmas congeladas de la API
+│   └── contrato.md
+├── Informe_planificador.docx
+├── Informe_planificador.pdf
+└── capturas/
+    ├── instancia.png
+    ├── ejecutar.png
+    └── comparar.png         reglas de desarrollo y firmas congeladas de la API
 ├── notebooks/
 │   └── demostracion_planificador.ipynb
 ├── planificador/
